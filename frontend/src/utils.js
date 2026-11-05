@@ -1,0 +1,83 @@
+const CURRENCY_KEY = "budget_currency";
+
+export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "CAD", "JPY"];
+
+export function getCurrency() {
+  try {
+    return localStorage.getItem(CURRENCY_KEY) || "EUR";
+  } catch {
+    return "EUR";
+  }
+}
+
+export function saveCurrency(c) {
+  try {
+    localStorage.setItem(CURRENCY_KEY, c);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function formatMoney(value, currency = getCurrency()) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value || 0));
+}
+
+const pad = (n) => String(n).padStart(2, "0");
+
+export const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+export const todayISO = () => toISO(new Date());
+
+export const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+export const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+export const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
+
+export const monthRange = (month) => ({ start: toISO(startOfMonth(month)), end: toISO(endOfMonth(month)) });
+
+export const monthLabel = (d) => d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+/** "This Month" / "Last Month" / "Next Month", otherwise "March 2026". */
+export function relativeMonthLabel(d) {
+  const now = startOfMonth(new Date());
+  const diff = (d.getFullYear() - now.getFullYear()) * 12 + d.getMonth() - now.getMonth();
+  return { 0: "This Month", [-1]: "Last Month", 1: "Next Month" }[diff] || monthLabel(d);
+}
+
+export const formatTime = (iso) =>
+  new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+export const formatDayHeader = (iso) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+
+export const formatDate = (iso) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+/** Default date for a new transaction: today if it is in the viewed month, else the 1st of that month. */
+export function defaultDateFor(month) {
+  const now = new Date();
+  if (now.getFullYear() === month.getFullYear() && now.getMonth() === month.getMonth()) return toISO(now);
+  return toISO(startOfMonth(month));
+}
+
+export const COLORS = ["#5b7fe0", "#f2a93b", "#9b5de5", "#ef5b5b", "#3dbe8b", "#2ec4b6", "#ff7aa8", "#f9844a", "#4cc9f0", "#8d99ae"];
+
+export const FREQUENCIES = [
+  { value: "daily", label: "Day" },
+  { value: "weekly", label: "Week" },
+  { value: "monthly", label: "Month" },
+  { value: "yearly", label: "Year" },
+];
+
+/** Flat list of { id, label, group } for a category <select>, subcategories under their parent. */
+export function categoryOptions(categories, kind) {
+  const tops = categories.filter((c) => !c.parent && (!kind || c.kind === kind));
+  const out = [];
+  tops.forEach((t) => {
+    const group = t.kind === "income" ? "Income" : "Expenses";
+    out.push({ id: t.id, label: t.name, group });
+    categories
+      .filter((c) => c.parent === t.id)
+      .forEach((c) => out.push({ id: c.id, label: `${t.name} › ${c.name}`, group }));
+  });
+  return out.sort((a, b) => (a.group === b.group ? 0 : a.group === "Expenses" ? -1 : 1));
+}
