@@ -1,4 +1,4 @@
-import { Repeat, Trash2 } from "lucide-react";
+import { Pencil, Repeat, Trash2 } from "lucide-react";
 import { api } from "../api.js";
 import { formatDayHeader, formatMoney, formatTime } from "../utils.js";
 import { CategoryIcon } from "../icons.jsx";
@@ -18,7 +18,8 @@ function groupByDay(transactions) {
 }
 
 /** Transactions grouped by day, newest first (the API already orders them). */
-export default function TransactionList({ transactions, onDeleted, empty = "No transactions." }) {
+/** `onEdit(tx)`, when given, adds an edit button next to delete. */
+export default function TransactionList({ transactions, onDeleted, onEdit, empty = "No transactions." }) {
   const remove = async (tx) => {
     if (!window.confirm("Delete this transaction?")) return;
     await api.deleteTransaction(tx.id);
@@ -55,7 +56,12 @@ export default function TransactionList({ transactions, onDeleted, empty = "No t
                     {tx.category_name}
                     {tx.recurring && <Repeat size={12} className="muted" aria-label="Recurring" />}
                   </div>
-                  {tx.description && <div className="tx-sub">{tx.description}</div>}
+                  {(tx.tag_name || tx.description) && (
+                    <div className="tx-sub">
+                      {tx.tag_name && <span className="tag-pill">{tx.tag_name}</span>}
+                      {tx.description}
+                    </div>
+                  )}
                 </div>
                 <div className="tx-right">
                   <span className={`tx-amount ${tx.kind}`}>
@@ -64,9 +70,16 @@ export default function TransactionList({ transactions, onDeleted, empty = "No t
                   </span>
                   <span className="tx-time">{formatTime(tx.created_at)}</span>
                 </div>
-                <button className="icon-btn tx-delete" onClick={() => remove(tx)} aria-label="Delete transaction">
-                  <Trash2 size={15} />
-                </button>
+                <div className="tx-actions">
+                  {onEdit && (
+                    <button className="icon-btn" onClick={() => onEdit(tx)} aria-label="Edit transaction" title="Edit">
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                  <button className="icon-btn danger" onClick={() => remove(tx)} aria-label="Delete transaction" title="Delete">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

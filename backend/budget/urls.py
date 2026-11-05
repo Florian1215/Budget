@@ -6,6 +6,7 @@ from . import views
 router = DefaultRouter()
 router.register("categories", views.CategoryViewSet, basename="category")
 router.register("transactions", views.TransactionViewSet, basename="transaction")
+router.register("tags", views.TagViewSet, basename="tag")
 router.register("recurring", views.RecurringTransactionViewSet, basename="recurring")
 
 urlpatterns = [

@@ -1,39 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Gauge, Pencil, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Gauge, Pencil, Plus, X } from "lucide-react";
 import { api } from "../api.js";
 import { defaultDateFor, formatMoney, monthLabel, monthRange } from "../utils.js";
 import { CategoryIcon } from "../icons.jsx";
 import Modal from "./Modal.jsx";
 import CategoryForm from "./CategoryForm.jsx";
-import LimitBar, { limitState } from "./LimitBar.jsx";
+import LimitBar from "./LimitBar.jsx";
 import TransactionForm from "./TransactionForm.jsx";
 import TransactionList from "./TransactionList.jsx";
 
-export default function CategoryModal({ category, categories, month, onOpen, onChanged, onClose }) {
-  const isSub = Boolean(category.parent);
-  const parent = isSub ? categories.find((c) => c.id === category.parent) : null;
-  const children = categories.filter((c) => c.parent === category.id);
-
+export default function CategoryModal({ category, month, onChanged, onClose }) {
   const [transactions, setTransactions] = useState([]);
   const [note, setNote] = useState(category.note);
   const [noteSaved, setNoteSaved] = useState(false);
-  const [mode, setMode] = useState("view"); // view | edit | new-sub
+  const [editing, setEditing] = useState(false);
+  const [filterTag, setFilterTag] = useState(null);
+  const [managingTags, setManagingTags] = useState(false);
+  const [newTag, setNewTag] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setNote(category.note);
-    setMode("view");
-    setError("");
-  }, [category.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const loadTransactions = useCallback(async () => {
-    const list = await api.transactions({
-      ...monthRange(month),
-      category: category.id,
-      include_children: isSub ? undefined : 1,
-    });
-    setTransactions(list);
-  }, [category.id, isSub, month]);
+    setTransactions(await api.transactions({ ...monthRange(month), category: category.id }));
+  }, [category.id, month]);
 
   useEffect(() => {
     loadTransactions().catch((e) => setError(e.message));
@@ -44,68 +32,82 @@ export default function CategoryModal({ category, categories, month, onOpen, onC
     onChanged();
   };
 
-  const saveNote = async () => {
+  const run = async (fn) => {
+    setError("");
     try {
+      await fn();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const saveNote = () =>
+    run(async () => {
       await api.updateCategory(category.id, { note });
       setNoteSaved(true);
       setTimeout(() => setNoteSaved(false), 1500);
       onChanged();
-    } catch (err) {
-      setError(err.message);
-    }
+    });
+
+  const addTag = (e) => {
+    e.preventDefault();
+    run(async () => {
+      await api.createTag({ category: category.id, name: newTag });
+      setNewTag("");
+      onChanged();
+    });
   };
 
-  const removeCategory = async () => {
-    const what = isSub ? "subcategory" : "category";
-    const extra = !isSub && children.length ? " and its subcategories" : "";
-    if (!window.confirm(`Delete this ${what}${extra}? All its transactions will be deleted too.`)) return;
-    try {
+  const removeTag = (tag) => {
+    if (!window.confirm(`Delete the tag "${tag.name}"? Its transactions are kept, without tag.`)) return;
+    run(async () => {
+      await api.deleteTag(tag.id);
+      if (filterTag === tag.id) setFilterTag(null);
+      refresh();
+    });
+  };
+
+  const removeCategory = () => {
+    if (!window.confirm("Delete this category? All its transactions will be deleted too.")) return;
+    run(async () => {
       await api.deleteCategory(category.id);
       onChanged();
-      if (parent) onOpen(parent.id);
-      else onClose();
-    } catch (err) {
-      setError(err.message);
-    }
+      onClose();
+    });
   };
 
-  const options = [
-    { id: category.id, label: isSub ? category.name : `${category.name} (no subcategory)` },
-    ...children.map((c) => ({ id: c.id, label: `${category.name} › ${c.name}` })),
-  ];
   const monthTotal = transactions.reduce((s, t) => s + Number(t.amount), 0);
+  const tagTotals = useMemo(() => {
+    const totals = {};
+    transactions.forEach((t) => {
+      if (t.tag) totals[t.tag] = (totals[t.tag] || 0) + Number(t.amount);
+    });
+    return totals;
+  }, [transactions]);
+  const visible = filterTag ? transactions.filter((t) => t.tag === filterTag) : transactions;
 
-  const title =
-    mode === "edit" ? (
-      `Edit ${isSub ? "subcategory" : "category"}`
-    ) : mode === "new-sub" ? (
-      `New subcategory in ${category.name}`
-    ) : (
-      <span className="modal-title">
-        {parent && (
-          <button className="icon-btn" onClick={() => onOpen(parent.id)} aria-label={`Back to ${parent.name}`}>
-            <ChevronLeft size={18} />
-          </button>
-        )}
-        <CategoryIcon icon={category.icon} color={category.color} size={34} />
-        <span>
-          <span className="modal-title-name">{category.name}</span>
-          <span className={`modal-title-sub ${category.kind}`}>
-            {parent ? `${parent.name} · ` : ""}
-            {formatMoney(monthTotal)} in {monthLabel(month)}
-          </span>
+  const title = editing ? (
+    "Edit category"
+  ) : (
+    <span className="modal-title">
+      <CategoryIcon icon={category.icon} color={category.color} size={34} />
+      <span>
+        <span className="modal-title-name">{category.name}</span>
+        <span className={`modal-title-sub ${category.kind}`}>
+          {formatMoney(monthTotal)} in {monthLabel(month)}
         </span>
       </span>
-    );
+    </span>
+  );
 
   return (
     <Modal
-      wide={mode === "view"}
+      wide={!editing}
       title={title}
       onClose={onClose}
       headerExtra={
-        mode === "view" && (
-          <button className="icon-btn" onClick={() => setMode("edit")} aria-label="Edit category" title="Edit name, icon, color">
+        !editing && (
+          <button className="icon-btn" onClick={() => setEditing(true)} aria-label="Edit category" title="Edit name, icon, color, limit">
             <Pencil size={16} />
           </button>
         )
@@ -113,36 +115,23 @@ export default function CategoryModal({ category, categories, month, onOpen, onC
     >
       {error && <div className="error">{error}</div>}
 
-      {mode === "edit" && (
+      {editing ? (
         <CategoryForm
           category={category}
           onSaved={() => {
-            setMode("view");
+            setEditing(false);
             onChanged();
           }}
-          onCancel={() => setMode("view")}
+          onCancel={() => setEditing(false)}
           onDelete={removeCategory}
         />
-      )}
-
-      {mode === "new-sub" && (
-        <CategoryForm
-          parent={category}
-          onSaved={(sub) => {
-            onChanged();
-            onOpen(sub.id);
-          }}
-          onCancel={() => setMode("view")}
-        />
-      )}
-
-      {mode === "view" && (
+      ) : (
         <>
           {category.monthly_limit ? (
-            <LimitBar spent={monthTotal} limit={category.monthly_limit} onClick={() => setMode("edit")} />
+            <LimitBar spent={monthTotal} limit={category.monthly_limit} onClick={() => setEditing(true)} />
           ) : (
             category.kind === "expense" && (
-              <button className="link-btn set-limit" onClick={() => setMode("edit")}>
+              <button className="link-btn set-limit" onClick={() => setEditing(true)}>
                 <Gauge size={15} /> Set a monthly limit
               </button>
             )
@@ -153,46 +142,55 @@ export default function CategoryModal({ category, categories, month, onOpen, onC
               <h4>Add {category.kind}</h4>
               <TransactionForm
                 key={category.id}
-                options={options}
+                categories={[category]}
                 defaultCategory={category.id}
+                lockCategory
                 defaultDate={defaultDateFor(month)}
-                onSaved={refresh}
+                onSaved={() => {
+                  onChanged();
+                  onClose();
+                }}
               />
             </div>
 
             <div className="side">
-              {!isSub && (
-                <>
-                  <h4>Subcategories</h4>
-                  <div className="group compact">
-                    {children.map((c) => (
-                      <button key={c.id} className="group-row" onClick={() => onOpen(c.id)}>
-                        <span className="row-label">
-                          <CategoryIcon icon={c.icon} color={c.color} size={26} />
-                          {c.name}
-                        </span>
-                        <span className={`muted row-label ${limitState(Number(c.total), Number(c.monthly_limit)) === "over" ? "expense" : ""}`}>
-                          {formatMoney(c.total)}
-                          {c.monthly_limit && ` / ${formatMoney(c.monthly_limit)}`} <ChevronRight size={16} />
-                        </span>
-                      </button>
-                    ))}
-                    <button className="group-row add-row" onClick={() => setMode("new-sub")}>
-                      <span className="row-label">
-                        <Plus size={16} /> Add subcategory
-                      </span>
+              <div className="side-header">
+                <h4>Tags</h4>
+                {category.tags.length > 0 && (
+                  <button className="link-btn small-text" onClick={() => setManagingTags((v) => !v)}>
+                    {managingTags ? "Done" : "Manage"}
+                  </button>
+                )}
+              </div>
+              <div className="chips">
+                {category.tags.map((t) => (
+                  <span key={t.id} className={`chip ${filterTag === t.id ? "active" : ""}`}>
+                    <button
+                      className="chip-main"
+                      onClick={() => setFilterTag((f) => (f === t.id ? null : t.id))}
+                      title="Show only this tag"
+                    >
+                      {t.name}
+                      {tagTotals[t.id] > 0 && <span className="chip-amount">{formatMoney(tagTotals[t.id])}</span>}
                     </button>
-                  </div>
-                </>
-              )}
+                    {managingTags && (
+                      <button className="chip-remove" onClick={() => removeTag(t)} aria-label={`Delete tag ${t.name}`}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+                {category.tags.length === 0 && <span className="muted small-text">No tags yet.</span>}
+              </div>
+              <form className="inline-form" onSubmit={addTag}>
+                <input value={newTag} onChange={(e) => setNewTag(e.target.value)} placeholder="New tag (e.g. Lunch)" maxLength={50} required />
+                <button className="btn small" aria-label="Add tag">
+                  <Plus size={16} />
+                </button>
+              </form>
 
               <h4>Note</h4>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-                placeholder="Add a note about this category…"
-              />
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Add a note about this category…" />
               <div className="note-actions">
                 {noteSaved && <span className="muted small-text">Saved ✓</span>}
                 <button className="btn small" onClick={saveNote} disabled={note === category.note}>
@@ -202,8 +200,19 @@ export default function CategoryModal({ category, categories, month, onOpen, onC
             </div>
           </div>
 
-          <h4>Transactions</h4>
-          <TransactionList transactions={transactions} onDeleted={refresh} empty="No transactions this month." />
+          <h4>
+            Transactions
+            {filterTag && (
+              <button className="filter-chip inline" onClick={() => setFilterTag(null)}>
+                {category.tags.find((t) => t.id === filterTag)?.name} <X size={12} />
+              </button>
+            )}
+          </h4>
+          <TransactionList
+            transactions={visible}
+            onDeleted={refresh}
+            empty={filterTag ? "No transactions with this tag this month." : "No transactions this month."}
+          />
         </>
       )}
     </Modal>

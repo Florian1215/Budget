@@ -1,17 +1,22 @@
 from django.contrib import admin
 
-from .models import Category, RecurringTransaction, Transaction
+from .models import Category, RecurringTransaction, Tag, Transaction
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "kind", "parent", "user")
+    list_display = ("name", "kind", "monthly_limit", "user")
     list_filter = ("kind",)
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "category")
 
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("date", "amount", "category", "description", "user")
+    list_display = ("date", "amount", "category", "tag", "description", "user")
     list_filter = ("category__kind",)
 
 

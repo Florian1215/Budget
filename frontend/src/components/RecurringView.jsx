@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pause, Play, Plus, Trash2 } from "lucide-react";
 import { api } from "../api.js";
-import { FREQUENCIES, categoryOptions, formatDate, formatMoney, todayISO } from "../utils.js";
+import { FREQUENCIES, formatDate, formatMoney, todayISO } from "../utils.js";
 import { CategoryIcon } from "../icons.jsx";
 import Modal from "./Modal.jsx";
 import TransactionForm from "./TransactionForm.jsx";
@@ -34,7 +34,6 @@ export default function RecurringView() {
     load();
   }, [load]);
 
-  const options = useMemo(() => categoryOptions(categories), [categories]);
 
   const run = async (fn) => {
     try {
@@ -73,8 +72,8 @@ export default function RecurringView() {
 
       <p className="hint">Rules add a transaction automatically on each due date — rent, salary, subscriptions…</p>
 
-      {!options.length && <p className="empty-text">Create a category first, then add recurring transactions.</p>}
-      {options.length > 0 && rules.length === 0 && <p className="empty-text">No recurring transaction yet.</p>}
+      {!categories.length && <p className="empty-text">Create a category first, then add recurring transactions.</p>}
+      {categories.length > 0 && rules.length === 0 && <p className="empty-text">No recurring transaction yet.</p>}
 
       {rules.length > 0 && (
         <ul className="tx-list group">
@@ -82,7 +81,10 @@ export default function RecurringView() {
             <li key={r.id} className={`tx ${r.active ? "" : "inactive"}`}>
               <CategoryIcon icon={r.category_icon} color={r.category_color} size={36} />
               <div className="tx-main">
-                <div className="tx-title">{r.description || r.category_name}</div>
+                <div className="tx-title">
+                  {r.description || r.category_name}
+                  {r.tag_name && <span className="tag-pill">{r.tag_name}</span>}
+                </div>
                 <div className="tx-sub">
                   {describe(r)}
                   {r.description && ` · ${r.category_name}`}
@@ -109,7 +111,7 @@ export default function RecurringView() {
         </ul>
       )}
 
-      {options.length > 0 && (
+      {categories.length > 0 && (
         <button className="fab" onClick={() => setAdding(true)} aria-label="New recurring transaction">
           <Plus size={24} />
         </button>
@@ -118,7 +120,7 @@ export default function RecurringView() {
       {adding && (
         <Modal title="New recurring transaction" onClose={() => setAdding(false)}>
           <TransactionForm
-            options={options}
+            categories={categories}
             defaultDate={todayISO()}
             forceRepeat
             onSaved={() => {

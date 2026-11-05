@@ -41,19 +41,15 @@ export function IconPicker({ value, color, onChange }) {
   );
 }
 
-/**
- * Create or edit a category.
- * - create: pass `kind` (top-level) or `parent` (subcategory)
- * - edit: pass `category`
- */
-export default function CategoryForm({ category, kind, parent, onSaved, onCancel, onDelete }) {
+/** Create (pass `kind`) or edit (pass `category`) a category. */
+export default function CategoryForm({ category, kind, onSaved, onCancel, onDelete }) {
   const editing = Boolean(category);
   const [name, setName] = useState(category?.name ?? "");
-  const [icon, setIcon] = useState(category?.icon ?? parent?.icon ?? "tag");
-  const [color, setColor] = useState(category?.color ?? parent?.color ?? (kind === "income" ? COLORS[4] : COLORS[0]));
+  const [icon, setIcon] = useState(category?.icon ?? "tag");
+  const [color, setColor] = useState(category?.color ?? (kind === "income" ? COLORS[4] : COLORS[0]));
   const [note, setNote] = useState(category?.note ?? "");
   const [limit, setLimit] = useState(category?.monthly_limit ?? "");
-  const isExpense = (category?.kind ?? parent?.kind ?? kind) === "expense";
+  const isExpense = (category?.kind ?? kind) === "expense";
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -65,7 +61,7 @@ export default function CategoryForm({ category, kind, parent, onSaved, onCancel
       const data = { name, icon, color, monthly_limit: isExpense && limit !== "" ? limit : null };
       const saved = editing
         ? await api.updateCategory(category.id, data)
-        : await api.createCategory({ ...data, note, ...(parent ? { parent: parent.id } : { kind }) });
+        : await api.createCategory({ ...data, note, kind });
       onSaved(saved);
     } catch (err) {
       setError(err.message);

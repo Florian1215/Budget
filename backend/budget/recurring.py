@@ -21,6 +21,7 @@ def generate_due_transactions(user, until=None):
                     Transaction(
                         user=user,
                         category_id=rule.category_id,
+                        tag_id=rule.tag_id,
                         amount=rule.amount,
                         date=date,
                         description=rule.description,

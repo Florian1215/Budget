@@ -68,16 +68,9 @@ export const FREQUENCIES = [
   { value: "yearly", label: "Year" },
 ];
 
-/** Flat list of { id, label, group } for a category <select>, subcategories under their parent. */
-export function categoryOptions(categories, kind) {
-  const tops = categories.filter((c) => !c.parent && (!kind || c.kind === kind));
-  const out = [];
-  tops.forEach((t) => {
-    const group = t.kind === "income" ? "Income" : "Expenses";
-    out.push({ id: t.id, label: t.name, group });
-    categories
-      .filter((c) => c.parent === t.id)
-      .forEach((c) => out.push({ id: c.id, label: `${t.name} › ${c.name}`, group }));
-  });
-  return out.sort((a, b) => (a.group === b.group ? 0 : a.group === "Expenses" ? -1 : 1));
+/** Options for a category <select>, expenses first. */
+export function categoryOptions(categories) {
+  return [...categories]
+    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "expense" ? -1 : 1))
+    .map((c) => ({ id: c.id, label: c.name, group: c.kind === "income" ? "Income" : "Expenses" }));
 }

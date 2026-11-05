@@ -8,12 +8,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Category, Kind, RecurringTransaction, Transaction
+from .models import Category, Kind, RecurringTransaction, Tag, Transaction
 from .recurring import generate_due_transactions
 from .serializers import (
     CategorySerializer,
     RecurringTransactionSerializer,
     RegisterSerializer,
+    TagSerializer,
     TransactionSerializer,
     UserSerializer,
 )
@@ -95,7 +96,7 @@ class CategoryViewSet(GenerateRecurringMixin, viewsets.ModelViewSet):
     serializer_class = CategorySerializer
 
     def get_queryset(self):
-        qs = Category.objects.filter(user=self.request.user)
+        qs = Category.objects.filter(user=self.request.user).prefetch_related("tags")
         kind = self.request.query_params.get("kind")
         if kind:
             qs = qs.filter(kind=kind)
@@ -121,29 +122,37 @@ class TransactionViewSet(GenerateRecurringMixin, viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
 
     def get_queryset(self):
-        qs = Transaction.objects.filter(user=self.request.user).select_related("category")
+        qs = Transaction.objects.filter(user=self.request.user).select_related("category", "tag")
         start, end = date_range(self.request)
         qs = filter_by_dates(qs, start, end)
         params = self.request.query_params
         if params.get("kind"):
             qs = qs.filter(category__kind=params["kind"])
         if params.get("category"):
-            cat = params["category"]
-            if params.get("include_children") in ("1", "true"):
-                qs = qs.filter(category_id=cat) | qs.filter(category__parent_id=cat)
-            else:
-                qs = qs.filter(category_id=cat)
+            qs = qs.filter(category_id=params["category"])
+        if params.get("tag"):
+            qs = qs.filter(tag_id=params["tag"])
         return qs
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
 
+class TagViewSet(viewsets.ModelViewSet):
+    serializer_class = TagSerializer
+
+    def get_queryset(self):
+        qs = Tag.objects.filter(category__user=self.request.user)
+        if self.request.query_params.get("category"):
+            qs = qs.filter(category_id=self.request.query_params["category"])
+        return qs
+
+
 class RecurringTransactionViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringTransactionSerializer
 
     def get_queryset(self):
-        return RecurringTransaction.objects.filter(user=self.request.user).select_related("category")
+        return RecurringTransaction.objects.filter(user=self.request.user).select_related("category", "tag")
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -157,15 +166,8 @@ class RecurringTransactionViewSet(viewsets.ModelViewSet):
 
 
 def total_limit(user):
-    """Sum of the expense category limits. A category without its own limit counts its subcategories' limits."""
-    categories = list(Category.objects.filter(user=user, kind=Kind.EXPENSE).values("id", "parent_id", "monthly_limit"))
-    total = 0
-    for top in (c for c in categories if c["parent_id"] is None):
-        if top["monthly_limit"] is not None:
-            total += top["monthly_limit"]
-        else:
-            total += sum(c["monthly_limit"] or 0 for c in categories if c["parent_id"] == top["id"])
-    return total or None
+    """The overall monthly limit is the sum of the expense category limits."""
+    return Category.objects.filter(user=user, kind=Kind.EXPENSE).aggregate(s=Sum("monthly_limit"))["s"]
 
 
 @api_view(["GET"])

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { api } from "../api.js";
-import { categoryOptions, defaultDateFor, formatDayHeader, formatMoney, monthRange, toISO, todayISO } from "../utils.js";
+import { defaultDateFor, formatDayHeader, formatMoney, monthRange, toISO, todayISO } from "../utils.js";
 import Modal from "./Modal.jsx";
 import TransactionForm from "./TransactionForm.jsx";
 import TransactionList from "./TransactionList.jsx";
@@ -15,6 +15,7 @@ export default function CalendarView({ month }) {
   const [categories, setCategories] = useState([]);
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [editingTx, setEditingTx] = useState(null);
   const [error, setError] = useState("");
 
   const range = useMemo(() => monthRange(month), [month]);
@@ -66,7 +67,6 @@ export default function CalendarView({ month }) {
     [transactions]
   );
 
-  const options = useMemo(() => categoryOptions(categories), [categories]);
   const today = todayISO();
   const visible = selected ? transactions.filter((t) => t.date === selected) : transactions;
 
@@ -125,19 +125,33 @@ export default function CalendarView({ month }) {
       <TransactionList
         transactions={visible}
         onDeleted={load}
+        onEdit={setEditingTx}
         empty={selected ? "Nothing on this day." : "No transactions this month."}
       />
 
-      {options.length > 0 && (
+      {categories.length > 0 && (
         <button className="fab" onClick={() => setAdding(true)} aria-label="Add transaction">
           <Plus size={24} />
         </button>
       )}
 
+      {editingTx && (
+        <Modal title="Edit transaction" onClose={() => setEditingTx(null)}>
+          <TransactionForm
+            categories={categories}
+            transaction={editingTx}
+            onSaved={() => {
+              setEditingTx(null);
+              load();
+            }}
+          />
+        </Modal>
+      )}
+
       {adding && (
         <Modal title="New transaction" onClose={() => setAdding(false)}>
           <TransactionForm
-            options={options}
+            categories={categories}
             defaultDate={selected || defaultDateFor(month)}
             onSaved={() => {
               setAdding(false);

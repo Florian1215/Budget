@@ -13,9 +13,6 @@ class Category(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=100)
     kind = models.CharField(max_length=10, choices=Kind.choices)
-    parent = models.ForeignKey(
-        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="children"
-    )
     note = models.TextField(blank=True, default="")
     color = models.CharField(max_length=7, default="#6366f1")
     icon = models.CharField(max_length=40, default="tag")
@@ -32,6 +29,20 @@ class Category(models.Model):
         return f"{self.name} ({self.kind})"
 
 
+class Tag(models.Model):
+    """A label inside a category (e.g. Food › Lunch) that can be put on a transaction."""
+
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="tags")
+    name = models.CharField(max_length=50)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["category", "name"], name="unique_tag_per_category")]
+
+    def __str__(self):
+        return f"{self.category.name} › {self.name}"
+
+
 class RecurringTransaction(models.Model):
     class Frequency(models.TextChoices):
         DAILY = "daily", "Daily"
@@ -41,6 +52,7 @@ class RecurringTransaction(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="recurring")
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="recurring")
+    tag = models.ForeignKey(Tag, null=True, blank=True, on_delete=models.SET_NULL, related_name="recurring")
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
     description = models.CharField(max_length=255, blank=True, default="")
     frequency = models.CharField(max_length=10, choices=Frequency.choices, default=Frequency.MONTHLY)
@@ -79,6 +91,7 @@ class RecurringTransaction(models.Model):
 class Transaction(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="transactions")
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="transactions")
+    tag = models.ForeignKey(Tag, null=True, blank=True, on_delete=models.SET_NULL, related_name="transactions")
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
     date = models.DateField()
     description = models.CharField(max_length=255, blank=True, default="")

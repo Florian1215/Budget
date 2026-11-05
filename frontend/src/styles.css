@@ -559,10 +559,10 @@ textarea:focus { outline: none; border-color: var(--accent); background: var(--s
 .tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .tx-amount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tx-time { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
-.tx-delete { opacity: 0; }
-.tx:hover .tx-delete,
-.tx-delete:focus-visible { opacity: 1; }
-@media (hover: none) { .tx-delete { opacity: 0.6; } }
+.tx-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
+.tx:hover .tx-actions,
+.tx-actions:focus-within { opacity: 1; }
+@media (hover: none) { .tx-actions { opacity: 0.7; } }
 
 /* ============ Grouped rows (settings, subcategories) ============ */
 
@@ -774,3 +774,59 @@ button.limit-bar:hover { filter: brightness(0.98); }
 .link-btn:hover { text-decoration: underline; }
 .set-limit { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; margin-bottom: 14px; }
 .no-margin { margin: 0; }
+
+/* ============ Tags ============ */
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow: hidden;
+  transition: background 0.15s, color 0.15s;
+}
+.chip.active { background: var(--highlight); color: var(--highlight-text); }
+button.chip.selectable { border: none; padding: 6px 12px; cursor: pointer; }
+button.chip.selectable:hover:not(.active) { background: var(--surface-3); }
+.chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip-amount { font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
+.chip-remove {
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  padding: 0 10px 0 0;
+  color: var(--danger);
+  cursor: pointer;
+}
+.side-header { display: flex; justify-content: space-between; align-items: baseline; }
+.side .chips { margin-bottom: 10px; }
+.inline-form { display: flex; gap: 6px; }
+.inline-form .btn { display: grid; place-items: center; }
+
+.tag-pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  vertical-align: 1px;
+}
+.tx-title .tag-pill { margin: 0 0 0 4px; }
+.filter-chip.inline { margin-left: 8px; padding: 2px 8px; font-size: 0.72rem; text-transform: none; letter-spacing: 0; vertical-align: 1px; }

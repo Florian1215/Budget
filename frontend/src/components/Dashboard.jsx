@@ -7,20 +7,6 @@ import CategoryModal from "./CategoryModal.jsx";
 import { NewCategoryModal } from "./CategoryForm.jsx";
 import LimitBar, { TileProgress, limitState } from "./LimitBar.jsx";
 
-export function buildTree(categories) {
-  const byParent = {};
-  categories.forEach((c) => {
-    if (c.parent) (byParent[c.parent] ||= []).push(c);
-  });
-  return categories
-    .filter((c) => !c.parent)
-    .map((c) => {
-      const children = byParent[c.id] || [];
-      const sum = Number(c.total || 0) + children.reduce((s, ch) => s + Number(ch.total || 0), 0);
-      return { ...c, children, sum };
-    });
-}
-
 const SECTIONS = [
   { kind: "expense", title: "Expense" },
   { kind: "income", title: "Income" },
@@ -51,7 +37,6 @@ export default function Dashboard({ month }) {
     load();
   }, [load]);
 
-  const tree = useMemo(() => buildTree(categories), [categories]);
   const openCategory = categories.find((c) => c.id === openId);
 
   return (
@@ -59,7 +44,7 @@ export default function Dashboard({ month }) {
       {error && <div className="error">{error}</div>}
 
       {SECTIONS.map(({ kind, title }) => {
-        const items = tree.filter((c) => c.kind === kind);
+        const items = categories.filter((c) => c.kind === kind);
         const isCollapsed = collapsed[kind];
         return (
           <section key={kind} className="home-section">
@@ -82,10 +67,10 @@ export default function Dashboard({ month }) {
                   <button key={c.id} className="tile" style={{ "--cat": c.color }} onClick={() => setOpenId(c.id)}>
                     <span className="tile-name">{c.name}</span>
                     <CategoryIcon icon={c.icon} color={c.color} size={36} />
-                    <span className={`tile-amount ${limitState(c.sum, Number(c.monthly_limit)) === "over" ? "expense" : ""}`}>
-                      {formatMoney(c.sum)}
+                    <span className={`tile-amount ${limitState(Number(c.total), Number(c.monthly_limit)) === "over" ? "expense" : ""}`}>
+                      {formatMoney(c.total)}
                     </span>
-                    {c.monthly_limit && <TileProgress spent={c.sum} limit={c.monthly_limit} />}
+                    {c.monthly_limit && <TileProgress spent={c.total} limit={c.monthly_limit} />}
                     {c.note && <span className="tile-note" title={c.note} />}
                   </button>
                 ))}
@@ -120,7 +105,6 @@ export default function Dashboard({ month }) {
       {openCategory && (
         <CategoryModal
           category={openCategory}
-          categories={categories}
           month={month}
           onOpen={setOpenId}
           onChanged={load}

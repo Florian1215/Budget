@@ -60,8 +60,13 @@ export const api = {
   updateCategory: (id, data) => request("PATCH", `/categories/${id}/`, data),
   deleteCategory: (id) => request("DELETE", `/categories/${id}/`),
 
+  createTag: (data) => request("POST", "/tags/", data),
+  updateTag: (id, data) => request("PATCH", `/tags/${id}/`, data),
+  deleteTag: (id) => request("DELETE", `/tags/${id}/`),
+
   transactions: (params) => request("GET", `/transactions/${qs(params)}`),
   createTransaction: (data) => request("POST", "/transactions/", data),
+  updateTransaction: (id, data) => request("PATCH", `/transactions/${id}/`, data),
   deleteTransaction: (id) => request("DELETE", `/transactions/${id}/`),
 
   recurring: () => request("GET", "/recurring/"),

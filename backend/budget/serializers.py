@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Category, RecurringTransaction, Transaction
+from .models import Category, RecurringTransaction, Tag, Transaction
 
 User = get_user_model()
 
@@ -38,13 +38,47 @@ class OwnedCategoryField(serializers.PrimaryKeyRelatedField):
         return Category.objects.filter(user=self.context["request"].user)
 
 
+class OwnedTagField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Tag.objects.filter(category__user=self.context["request"].user)
+
+
+class TagSerializer(serializers.ModelSerializer):
+    category = OwnedCategoryField()
+
+    class Meta:
+        model = Tag
+        fields = ["id", "category", "name"]
+        validators = []  # uniqueness is checked case-insensitively below
+
+    def validate(self, attrs):
+        category = attrs.get("category", getattr(self.instance, "category", None))
+        name = attrs.get("name", getattr(self.instance, "name", "")).strip()
+        if not name:
+            raise serializers.ValidationError({"name": "This field may not be blank."})
+        clash = Tag.objects.filter(category=category, name__iexact=name)
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+            attrs.pop("category", None)  # a tag stays in its category
+        if clash.exists():
+            raise serializers.ValidationError({"name": "This tag already exists in this category."})
+        attrs["name"] = name
+        return attrs
+
+
+class CategoryTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ["id", "name"]
+
+
 class CategorySerializer(serializers.ModelSerializer):
-    parent = OwnedCategoryField(allow_null=True, required=False)
+    tags = CategoryTagSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ["id", "name", "kind", "parent", "note", "color", "icon", "monthly_limit", "total", "created_at"]
+        fields = ["id", "name", "kind", "note", "color", "icon", "monthly_limit", "tags", "total", "created_at"]
         read_only_fields = ["created_at"]
         extra_kwargs = {"kind": {"required": False}}
 
@@ -55,23 +89,33 @@ class CategorySerializer(serializers.ModelSerializer):
         return str(totals.get(obj.id, 0))
 
     def validate(self, attrs):
-        parent = attrs.get("parent", getattr(self.instance, "parent", None))
         if self.instance is not None:
-            # The kind of an existing category cannot change (keeps subcategories consistent).
-            attrs.pop("kind", None)
-            if parent is not None and (parent.pk == self.instance.pk or self.instance.children.exists()):
-                raise serializers.ValidationError({"parent": "This category cannot become a subcategory."})
-        if parent is not None:
-            if parent.parent_id is not None:
-                raise serializers.ValidationError({"parent": "Subcategories cannot have subcategories."})
-            attrs["kind"] = parent.kind
-        elif self.instance is None and not attrs.get("kind"):
+            attrs.pop("kind", None)  # the kind of an existing category cannot change
+        elif not attrs.get("kind"):
             raise serializers.ValidationError({"kind": "This field is required."})
         return attrs
 
 
-class TransactionSerializer(serializers.ModelSerializer):
+class TagNameMixin:
+    def get_tag_name(self, obj):
+        return obj.tag.name if obj.tag_id else None
+
+
+def validate_tag_in_category(serializer, attrs):
+    """The tag must belong to the transaction's category; changing the category drops a stale tag."""
+    category = attrs.get("category", getattr(serializer.instance, "category", None))
+    if "tag" in attrs:
+        if attrs["tag"] is not None and attrs["tag"].category_id != category.id:
+            raise serializers.ValidationError({"tag": "This tag belongs to another category."})
+    elif serializer.instance is not None and serializer.instance.tag_id is not None:
+        if serializer.instance.tag.category_id != category.id:
+            attrs["tag"] = None
+
+
+class TransactionSerializer(TagNameMixin, serializers.ModelSerializer):
     category = OwnedCategoryField()
+    tag = OwnedTagField(allow_null=True, required=False)
+    tag_name = serializers.SerializerMethodField()
     kind = serializers.CharField(source="category.kind", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_color = serializers.CharField(source="category.color", read_only=True)
@@ -81,13 +125,19 @@ class TransactionSerializer(serializers.ModelSerializer):
         model = Transaction
         fields = [
             "id", "category", "category_name", "category_color", "category_icon", "kind",
-            "amount", "date", "description", "recurring", "created_at",
+            "tag", "tag_name", "amount", "date", "description", "recurring", "created_at",
         ]
         read_only_fields = ["recurring", "created_at"]
 
+    def validate(self, attrs):
+        validate_tag_in_category(self, attrs)
+        return attrs
 
-class RecurringTransactionSerializer(serializers.ModelSerializer):
+
+class RecurringTransactionSerializer(TagNameMixin, serializers.ModelSerializer):
     category = OwnedCategoryField()
+    tag = OwnedTagField(allow_null=True, required=False)
+    tag_name = serializers.SerializerMethodField()
     kind = serializers.CharField(source="category.kind", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_color = serializers.CharField(source="category.color", read_only=True)
@@ -97,13 +147,15 @@ class RecurringTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecurringTransaction
         fields = [
-            "id", "category", "category_name", "category_color", "category_icon", "kind", "amount", "description",
+            "id", "category", "category_name", "category_color", "category_icon", "kind",
+            "tag", "tag_name", "amount", "description",
             "frequency", "interval", "start_date", "end_date", "active",
             "occurrences", "next_date", "created_at",
         ]
         read_only_fields = ["occurrences", "created_at"]
 
     def validate(self, attrs):
+        validate_tag_in_category(self, attrs)
         start = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end = attrs.get("end_date", getattr(self.instance, "end_date", None))
         if start and end and end < start:

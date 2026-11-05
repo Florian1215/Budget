@@ -1,26 +1,30 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { FREQUENCIES } from "../utils.js";
-
-function groupOptions(options) {
-  const groups = new Map();
-  options.forEach((o) => {
-    const g = o.group || "";
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g).push(o);
-  });
-  return [...groups.entries()];
-}
+import { FREQUENCIES, categoryOptions } from "../utils.js";
 
 /**
- * Form to add a transaction (or a recurring rule when "Repeat" is checked).
- * `options` is a list of { id, label, group? } the user can pick the category from.
+ * Add a transaction (or a recurring rule when "Repeat" is checked), or edit `transaction` when given.
+ * `categories` are full category objects (with their `tags`).
+ * `lockCategory` hides the category picker (used inside a category popup).
  */
-export default function TransactionForm({ options, defaultCategory, defaultDate, onSaved, submitLabel = "Add", forceRepeat = false }) {
-  const [category, setCategory] = useState(defaultCategory ?? options[0]?.id ?? "");
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(defaultDate);
-  const [description, setDescription] = useState("");
+export default function TransactionForm({
+  categories,
+  defaultCategory,
+  lockCategory = false,
+  defaultDate,
+  onSaved,
+  submitLabel = "Save",
+  forceRepeat = false,
+  transaction = null,
+}) {
+  const editing = Boolean(transaction);
+  const [category, setCategory] = useState(
+    transaction?.category ?? defaultCategory ?? categoryOptions(categories)[0]?.id ?? ""
+  );
+  const [tag, setTag] = useState(transaction?.tag ?? null);
+  const [amount, setAmount] = useState(transaction?.amount ?? "");
+  const [date, setDate] = useState(transaction?.date ?? defaultDate);
+  const [description, setDescription] = useState(transaction?.description ?? "");
   const [repeat, setRepeat] = useState(forceRepeat);
   const [frequency, setFrequency] = useState("monthly");
   const [every, setEvery] = useState(1);
@@ -28,14 +32,23 @@ export default function TransactionForm({ options, defaultCategory, defaultDate,
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const tags = categories.find((c) => c.id === category)?.tags || [];
+  const options = categoryOptions(categories);
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     setSaving(true);
     try {
+      if (editing) {
+        await api.updateTransaction(transaction.id, { category, tag, amount, date, description });
+        onSaved?.();
+        return;
+      }
       if (repeat) {
         await api.createRecurring({
           category,
+          tag,
           amount,
           description,
           frequency,
@@ -44,10 +57,11 @@ export default function TransactionForm({ options, defaultCategory, defaultDate,
           end_date: endDate || null,
         });
       } else {
-        await api.createTransaction({ category, amount, date, description });
+        await api.createTransaction({ category, tag, amount, date, description });
       }
       setAmount("");
       setDescription("");
+      setTag(null);
       setRepeat(forceRepeat);
       setEndDate("");
       onSaved?.();
@@ -81,36 +95,59 @@ export default function TransactionForm({ options, defaultCategory, defaultDate,
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </label>
       </div>
-      {(options.length > 1 || options[0]?.group) && (
+
+      {!lockCategory && (
         <label>
           Category
-          <select value={category} onChange={(e) => setCategory(Number(e.target.value))}>
-            {groupOptions(options).map(([group, items]) =>
-              group ? (
-                <optgroup key={group} label={group}>
-                  {items.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : (
-                items.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))
-              )
-            )}
+          <select
+            value={category}
+            onChange={(e) => {
+              setCategory(Number(e.target.value));
+              setTag(null);
+            }}
+          >
+            {["Expenses", "Income"].map((group) => {
+              const items = options.filter((o) => o.group === group);
+              return (
+                items.length > 0 && (
+                  <optgroup key={group} label={group}>
+                    {items.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              );
+            })}
           </select>
         </label>
       )}
+
+      {tags.length > 0 && (
+        <div className="field">
+          <span className="field-label">Tag</span>
+          <div className="chips">
+            {tags.map((t) => (
+              <button
+                type="button"
+                key={t.id}
+                className={`chip selectable ${tag === t.id ? "active" : ""}`}
+                onClick={() => setTag((cur) => (cur === t.id ? null : t.id))}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <label>
         Description <span className="muted">(optional)</span>
         <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={255} />
       </label>
 
-      {!forceRepeat && (
+      {!forceRepeat && !editing && (
         <label className="checkbox">
           <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} />
           Repeat automatically
