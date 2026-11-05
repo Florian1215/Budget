@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pause, Play, Plus, Trash2 } from "lucide-react";
+import { Plus, Square, Trash2 } from "lucide-react";
 import { api } from "../api.js";
 import { FREQUENCIES, formatDate, formatMoney, todayISO } from "../utils.js";
 import { CategoryIcon } from "../icons.jsx";
@@ -44,7 +44,10 @@ export default function RecurringView() {
     }
   };
 
-  const toggle = (rule) => run(() => api.updateRecurring(rule.id, { active: !rule.active }));
+  const stop = (rule) => {
+    if (!window.confirm("Stop this recurring rule? No new transaction will be added. Past ones are kept.")) return;
+    run(() => api.updateRecurring(rule.id, { active: false }));
+  };
   const remove = (rule) => {
     if (!window.confirm("Delete this recurring rule? Transactions already created are kept.")) return;
     run(() => api.deleteRecurring(rule.id));
@@ -97,12 +100,16 @@ export default function RecurringView() {
                   {formatMoney(r.amount)}
                 </span>
                 <span className="tx-time">
-                  {!r.next_date ? "Finished" : r.active ? `Next ${formatDate(r.next_date)}` : "Paused"}
+                  {!r.active ? "Stopped" : r.next_date ? `Next ${formatDate(r.next_date)}` : "Finished"}
                 </span>
               </div>
-              <button className="icon-btn" onClick={() => toggle(r)} aria-label={r.active ? "Pause" : "Resume"} title={r.active ? "Pause" : "Resume"}>
-                {r.active ? <Pause size={15} /> : <Play size={15} />}
-              </button>
+              {r.active && r.next_date ? (
+                <button className="icon-btn danger" onClick={() => stop(r)} aria-label="Stop rule" title="Stop">
+                  <Square size={14} fill="currentColor" />
+                </button>
+              ) : (
+                <span className="icon-btn-spacer" />
+              )}
               <button className="icon-btn danger" onClick={() => remove(r)} aria-label="Delete rule">
                 <Trash2 size={15} />
               </button>

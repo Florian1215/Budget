@@ -830,3 +830,4 @@ button.chip.selectable:hover:not(.active) { background: var(--surface-3); }
 }
 .tx-title .tag-pill { margin: 0 0 0 4px; }
 .filter-chip.inline { margin-left: 8px; padding: 2px 8px; font-size: 0.72rem; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+.icon-btn-spacer { width: 32px; flex-shrink: 0; }
