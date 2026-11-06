@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { COLORS } from "../utils.js";
+import { AMOUNT_INPUT_PROPS, COLORS, normalizeAmount } from "../utils.js";
 import { CATEGORY_ICONS, CategoryIcon } from "../icons.jsx";
 import Modal from "./Modal.jsx";
 
@@ -96,12 +96,9 @@ export default function CategoryForm({ category, kind, onSaved, onCancel, onDele
         <label>
           Monthly limit <span className="muted">(optional)</span>
           <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0.01"
+            {...AMOUNT_INPUT_PROPS}
             value={limit}
-            onChange={(e) => setLimit(e.target.value)}
+            onChange={(e) => setLimit(normalizeAmount(e.target.value))}
             placeholder="No limit"
           />
         </label>

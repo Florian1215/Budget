@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { FREQUENCIES, categoryOptions } from "../utils.js";
+import { AMOUNT_INPUT_PROPS, FREQUENCIES, categoryOptions, normalizeAmount } from "../utils.js";
 
 /**
  * Add a transaction (or a recurring rule when "Repeat" is checked), or edit `transaction` when given.
@@ -78,12 +78,9 @@ export default function TransactionForm({
         <label className="grow">
           Amount
           <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0.01"
+            {...AMOUNT_INPUT_PROPS}
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => setAmount(normalizeAmount(e.target.value))}
             required
             autoFocus
             placeholder="0.00"

@@ -74,3 +74,13 @@ export function categoryOptions(categories) {
     .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "expense" ? -1 : 1))
     .map((c) => ({ id: c.id, label: c.name, group: c.kind === "income" ? "Income" : "Expenses" }));
 }
+
+/** Accept both "14,44" and "14.44": keep digits and a single decimal separator, normalized to ".". */
+export function normalizeAmount(value) {
+  const cleaned = String(value).replace(/,/g, ".").replace(/[^\d.]/g, "");
+  const [int, ...rest] = cleaned.split(".");
+  return rest.length ? `${int}.${rest.join("").slice(0, 2)}` : int;
+}
+
+/** Shared props for amount inputs (text input so the comma isn't rejected by the browser). */
+export const AMOUNT_INPUT_PROPS = { type: "text", inputMode: "decimal", pattern: "\\d*\\.?\\d{0,2}", autoComplete: "off" };

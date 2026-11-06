@@ -244,7 +244,6 @@ textarea:focus { outline: none; border-color: var(--accent); background: var(--s
   margin: 0 auto;
 }
 .topbar-side.right { justify-self: end; }
-.account-name { color: var(--accent); font-weight: 600; font-size: 0.9rem; }
 
 .month-switch { display: flex; align-items: center; gap: 2px; }
 .month-label {
@@ -802,6 +801,7 @@ button.chip.selectable:hover:not(.active) { background: var(--surface-3); }
   font-weight: 600;
   cursor: pointer;
 }
+span.chip-main { cursor: default; }
 .chip-amount { font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
 .chip-remove {
   display: grid;

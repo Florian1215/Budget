@@ -7,14 +7,10 @@ import Modal from "./Modal.jsx";
 import CategoryForm from "./CategoryForm.jsx";
 import LimitBar from "./LimitBar.jsx";
 import TransactionForm from "./TransactionForm.jsx";
-import TransactionList from "./TransactionList.jsx";
 
 export default function CategoryModal({ category, month, onChanged, onClose }) {
   const [transactions, setTransactions] = useState([]);
-  const [note, setNote] = useState(category.note);
-  const [noteSaved, setNoteSaved] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [filterTag, setFilterTag] = useState(null);
   const [managingTags, setManagingTags] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [error, setError] = useState("");
@@ -41,14 +37,6 @@ export default function CategoryModal({ category, month, onChanged, onClose }) {
     }
   };
 
-  const saveNote = () =>
-    run(async () => {
-      await api.updateCategory(category.id, { note });
-      setNoteSaved(true);
-      setTimeout(() => setNoteSaved(false), 1500);
-      onChanged();
-    });
-
   const addTag = (e) => {
     e.preventDefault();
     run(async () => {
@@ -62,7 +50,6 @@ export default function CategoryModal({ category, month, onChanged, onClose }) {
     if (!window.confirm(`Delete the tag "${tag.name}"? Its transactions are kept, without tag.`)) return;
     run(async () => {
       await api.deleteTag(tag.id);
-      if (filterTag === tag.id) setFilterTag(null);
       refresh();
     });
   };
@@ -84,7 +71,6 @@ export default function CategoryModal({ category, month, onChanged, onClose }) {
     });
     return totals;
   }, [transactions]);
-  const visible = filterTag ? transactions.filter((t) => t.tag === filterTag) : transactions;
 
   const title = editing ? (
     "Edit category"
@@ -164,15 +150,11 @@ export default function CategoryModal({ category, month, onChanged, onClose }) {
               </div>
               <div className="chips">
                 {category.tags.map((t) => (
-                  <span key={t.id} className={`chip ${filterTag === t.id ? "active" : ""}`}>
-                    <button
-                      className="chip-main"
-                      onClick={() => setFilterTag((f) => (f === t.id ? null : t.id))}
-                      title="Show only this tag"
-                    >
+                  <span key={t.id} className="chip">
+                    <span className="chip-main">
                       {t.name}
                       {tagTotals[t.id] > 0 && <span className="chip-amount">{formatMoney(tagTotals[t.id])}</span>}
-                    </button>
+                    </span>
                     {managingTags && (
                       <button className="chip-remove" onClick={() => removeTag(t)} aria-label={`Delete tag ${t.name}`}>
                         <X size={12} />
@@ -188,31 +170,8 @@ export default function CategoryModal({ category, month, onChanged, onClose }) {
                   <Plus size={16} />
                 </button>
               </form>
-
-              <h4>Note</h4>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Add a note about this category…" />
-              <div className="note-actions">
-                {noteSaved && <span className="muted small-text">Saved ✓</span>}
-                <button className="btn small" onClick={saveNote} disabled={note === category.note}>
-                  Save note
-                </button>
-              </div>
             </div>
           </div>
-
-          <h4>
-            Transactions
-            {filterTag && (
-              <button className="filter-chip inline" onClick={() => setFilterTag(null)}>
-                {category.tags.find((t) => t.id === filterTag)?.name} <X size={12} />
-              </button>
-            )}
-          </h4>
-          <TransactionList
-            transactions={visible}
-            onDeleted={refresh}
-            empty={filterTag ? "No transactions with this tag this month." : "No transactions this month."}
-          />
         </>
       )}
     </Modal>

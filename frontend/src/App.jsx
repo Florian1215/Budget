@@ -69,9 +69,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="topbar-side">
-          <span className="account-name">{user.username}</span>
-        </div>
+        <div className="topbar-side" />
         {showMonth ? (
           <div className="month-switch">
             <button className="icon-btn" onClick={() => setMonth((m) => addMonths(m, -1))} aria-label="Previous month">
